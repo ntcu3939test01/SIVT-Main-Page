@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SIVT 科學探究虛擬教師 - 引導學生進行科學探究學習">
+    <title>SIVT 科學探究虛擬教師</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- 側邊欄 -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                        <path d="M2 17l10 5 10-5" />
+                        <path d="M2 12l10 5 10-5" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>SIVT</h1>
+                    <span>科學探究虛擬教師</span>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- 探究歷程指示 -->
+            <div class="inquiry-phases">
+                <h3>探究歷程</h3>
+                <ul class="phase-list">
+                    <li class="phase-item" data-phase="1">
+                        <span class="phase-number">1</span>
+                        <span class="phase-name">發現問題</span>
+                    </li>
+                    <li class="phase-item" data-phase="2">
+                        <span class="phase-number">2</span>
+                        <span class="phase-name">規劃與研究</span>
+                    </li>
+                    <li class="phase-item" data-phase="3">
+                        <span class="phase-number">3</span>
+                        <span class="phase-name">論證與建模</span>
+                    </li>
+                    <li class="phase-item" data-phase="4">
+                        <span class="phase-number">4</span>
+                        <span class="phase-name">表達與分享</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- AI 模型選擇 -->
+            <div class="model-section">
+                <label for="model-select">AI 模型</label>
+                <select id="model-select">
+                    <option value="azure">Azure OpenAI</option>
+                    <option value="openai">OpenAI GPT</option>
+                </select>
+            </div>
+
+            <!-- 狀態指示 -->
+            <div class="status-section">
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">檢查連線中...</span>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="clear-btn" id="clear-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3,6 5,6 21,6" />
+                        <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6" />
+                    </svg>
+                    <span>清除對話</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- 主要內容區 -->
+        <main class="main-content">
+            <!-- 頂部標題列 -->
+            <header class="chat-header">
+                <div class="header-info">
+                    <h2>與虛擬教師對話</h2>
+                    <p>我會引導你完成科學探究的每個步驟</p>
+                </div>
+            </header>
+
+            <!-- 聊天區域 -->
+            <div class="chat-container" id="chat-container">
+                <div class="welcome-section">
+                    <div class="welcome-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 16v-4M12 8h.01" />
+                        </svg>
+                    </div>
+                    <h2>歡迎來到科學探究教室</h2>
+                    <p>我是你的虛擬科學教師，將引導你完成探究學習的四大歷程</p>
+                    <div class="quick-start">
+                        <p class="hint">你可以嘗試這樣開始：</p>
+                        <div class="suggestion-chips">
+                            <button class="chip" data-message="我想開始進行科學探究">開始探究</button>
+                            <button class="chip" data-message="什麼是科學探究？">什麼是探究?</button>
+                            <button class="chip" data-message="請說明探究的四個歷程">四大歷程</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 輸入區 -->
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea id="message-input" placeholder="輸入你的問題或想法..." rows="1"></textarea>
+                    <button id="send-btn" class="send-btn" title="發送訊息">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="input-hint">按 Enter 發送，Shift + Enter 換行</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
