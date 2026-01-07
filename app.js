@@ -9,11 +9,17 @@ const API_BASE_URL = 'https://unurged-marivel-unawaking.ngrok-free.dev';
 // ========================================
 
 // DOM 元素
-let chatContainer, messageInput, sendBtn, clearBtn, modelSelect, statusIndicator;
+let chatContainer, messageInput, sendBtn, clearBtn, modelSelect, statusIndicator, voiceBtn;
 
 // 狀態
 let isLoading = false;
 let currentPhase = 1;
+
+// 語音相關
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let currentAudio = null;
 
 /**
  * 初始化應用
@@ -26,6 +32,7 @@ async function init() {
     clearBtn = document.getElementById('clear-btn');
     modelSelect = document.getElementById('model-select');
     statusIndicator = document.getElementById('status-indicator');
+    voiceBtn = document.getElementById('voice-btn');
 
     // 初始化功能
     checkHealth();
@@ -62,6 +69,23 @@ function setupEventListeners() {
         const model = modelSelect.value;
         const modelName = model === 'azure' ? 'Azure OpenAI' : 'OpenAI GPT';
         addSystemMessage(`已切換至 ${modelName}`);
+    });
+
+    // 語音按鈕事件（按住錄音）
+    voiceBtn.addEventListener('mousedown', startRecording);
+    voiceBtn.addEventListener('mouseup', stopRecording);
+    voiceBtn.addEventListener('mouseleave', () => {
+        if (isRecording) stopRecording();
+    });
+
+    // 觸控設備支援
+    voiceBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        startRecording();
+    });
+    voiceBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        stopRecording();
     });
 
     // 快速開始按鈕
@@ -208,6 +232,302 @@ async function sendMessage() {
 }
 
 /**
+ * 開始錄音
+ */
+async function startRecording() {
+    if (isRecording || isLoading) return;
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'audio/webm'
+        });
+
+        audioChunks = [];
+
+        mediaRecorder.addEventListener('dataavailable', (event) => {
+            audioChunks.push(event.data);
+        });
+
+        mediaRecorder.addEventListener('stop', async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            await sendVoiceToText(audioBlob);
+
+            // 停止所有音訊軌道
+            stream.getTracks().forEach(track => track.stop());
+        });
+
+        mediaRecorder.start();
+        isRecording = true;
+
+        // 更新 UI
+        voiceBtn.classList.add('recording');
+        addSystemMessage('正在錄音中，放開按鈕停止...');
+
+    } catch (error) {
+        console.error('無法存取麥克風:', error);
+        addErrorMessage('無法存取麥克風，請確認已授予麥克風權限');
+    }
+}
+
+/**
+ * 停止錄音
+ */
+function stopRecording() {
+    if (!isRecording || !mediaRecorder) return;
+
+    isRecording = false;
+    voiceBtn.classList.remove('recording');
+    mediaRecorder.stop();
+}
+
+/**
+ * 將語音傳送到後端轉文字
+ */
+async function sendVoiceToText(audioBlob) {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+
+    // 顯示載入動畫
+    const typingIndicator = showTypingIndicator();
+    isLoading = true;
+    sendBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/speech-to-text`, {
+            method: 'POST',
+            headers: {
+                'ngrok-skip-browser-warning': 'true'
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+        typingIndicator.remove();
+
+        if (data.success && data.text) {
+            // 將辨識結果填入輸入框
+            messageInput.value = data.text;
+            autoResizeTextarea();
+
+            // 重置 loading 狀態後再發送訊息
+            isLoading = false;
+            sendBtn.disabled = false;
+
+            // 自動發送訊息
+            sendMessage();
+        } else {
+            addErrorMessage(data.error || '語音辨識失敗');
+            isLoading = false;
+            sendBtn.disabled = false;
+        }
+
+    } catch (error) {
+        typingIndicator.remove();
+        addErrorMessage('語音辨識服務無法連接');
+        isLoading = false;
+        sendBtn.disabled = false;
+    }
+}
+
+/**
+ * 播放 AI 回覆的語音（帶字幕效果）
+ */
+async function playAIVoiceWithCaption(text, messageElement) {
+    const contentDiv = messageElement.querySelector('.message-content');
+    const voiceTextDiv = messageElement.querySelector('.voice-text');
+    const loadingIndicator = messageElement.querySelector('.voice-loading-indicator');
+
+    try {
+        console.log('[TTS] 開始請求語音合成:', text.substring(0, 50) + '...');
+
+        const response = await fetch(`${API_BASE_URL}/api/text-to-speech`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({
+                text: text,
+                voice: 'nova'  // 使用 nova 聲音（女聲，適合教學）
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[TTS] 服務失敗:', response.status, errorText);
+            // 失敗時直接顯示完整文字
+            if (loadingIndicator) loadingIndicator.remove();
+            if (voiceTextDiv) {
+                voiceTextDiv.innerHTML = formatMessage(text);
+                voiceTextDiv.style.display = 'block';
+            }
+            contentDiv.classList.remove('voice-loading');
+            throw new Error('TTS 服務失敗');
+        }
+
+        const audioBlob = await response.blob();
+        console.log('[TTS] 接收到音訊:', audioBlob.size, 'bytes');
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        // 停止當前播放的音訊
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio = null;
+        }
+
+        // 建立並播放新音訊
+        const audio = new Audio(audioUrl);
+        currentAudio = audio;
+
+        // 取得音訊時長（需要載入後才知道）
+        audio.addEventListener('loadedmetadata', () => {
+            const duration = audio.duration;
+            console.log('[TTS] 音訊時長:', duration, '秒');
+
+            // 開始打字機效果
+            startTypingEffect(voiceTextDiv, text, duration, contentDiv, loadingIndicator);
+        });
+
+        // 加入播放控制按鈕
+        addAudioControls(messageElement, audio, contentDiv);
+
+        // 自動播放
+        console.log('[TTS] 開始播放語音');
+        audio.play();
+
+        audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            console.log('[TTS] 播放完成');
+        });
+
+    } catch (error) {
+        console.error('[TTS] 語音播放失敗:', error);
+        // 失敗時確保文字正常顯示
+        if (loadingIndicator) loadingIndicator.remove();
+        if (voiceTextDiv) {
+            voiceTextDiv.innerHTML = formatMessage(text);
+            voiceTextDiv.style.display = 'block';
+        }
+        contentDiv.classList.remove('voice-loading');
+    }
+}
+
+/**
+ * 打字機效果 - 逐字顯示文字
+ */
+function startTypingEffect(voiceTextDiv, fullText, duration, contentDiv, loadingIndicator) {
+    if (!voiceTextDiv) return;
+
+    // 移除載入指示器
+    if (loadingIndicator) {
+        loadingIndicator.remove();
+    }
+
+    // 顯示文字容器
+    voiceTextDiv.style.display = 'block';
+    contentDiv.classList.remove('voice-loading');
+    contentDiv.classList.add('voice-typing');
+
+    // 計算打字速度（每個字元的顯示時間）
+    const charCount = fullText.length;
+    const charDelay = (duration * 1000) / charCount; // 毫秒
+
+    let currentIndex = 0;
+    let displayedText = '';
+
+    const typingInterval = setInterval(() => {
+        if (currentIndex < charCount) {
+            displayedText += fullText[currentIndex];
+            voiceTextDiv.innerHTML = formatMessage(displayedText);
+            currentIndex++;
+        } else {
+            clearInterval(typingInterval);
+            contentDiv.classList.remove('voice-typing');
+            contentDiv.classList.add('voice-completed');
+        }
+    }, charDelay);
+
+    // 儲存 interval ID 以便在需要時可以清除
+    voiceTextDiv.dataset.typingInterval = typingInterval;
+}
+
+/**
+ * 在訊息中加入音訊控制按鈕
+ */
+function addAudioControls(messageElement, audio, contentDiv) {
+    if (!contentDiv) {
+        contentDiv = messageElement.querySelector('.message-content');
+    }
+    if (!contentDiv) return;
+
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'audio-controls';
+
+    // 播放/暫停按鈕
+    const playBtn = document.createElement('button');
+    playBtn.className = 'audio-play-btn';
+    playBtn.title = '暫停播放';
+    playBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="2"/>
+            <rect x="14" y="4" width="4" height="16" rx="2"/>
+        </svg>
+    `;
+
+    let isPlaying = true;
+
+    playBtn.addEventListener('click', () => {
+        if (isPlaying) {
+            audio.pause();
+            playBtn.title = '繼續播放';
+            playBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+            `;
+        } else {
+            audio.play();
+            playBtn.title = '暫停播放';
+            playBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16" rx="2"/>
+                    <rect x="14" y="4" width="4" height="16" rx="2"/>
+                </svg>
+            `;
+        }
+        isPlaying = !isPlaying;
+    });
+
+    audio.addEventListener('play', () => {
+        isPlaying = true;
+        playBtn.title = '暫停播放';
+        playBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="2"/>
+                <rect x="14" y="4" width="4" height="16" rx="2"/>
+            </svg>
+        `;
+    });
+
+    audio.addEventListener('pause', () => {
+        isPlaying = false;
+        playBtn.title = '繼續播放';
+        playBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+            </svg>
+        `;
+    });
+
+    controlsDiv.appendChild(playBtn);
+    contentDiv.appendChild(controlsDiv);
+}
+
+/**
  * 添加訊息到聊天區
  */
 function addMessage(content, type, provider = null) {
@@ -221,17 +541,46 @@ function addMessage(content, type, provider = null) {
         headerText = provider === 'openai' ? 'OpenAI' : 'Azure';
     }
 
-    messageDiv.innerHTML = `
-        <div class="message-header">
-            <span>${headerText}</span>
-        </div>
-        <div class="message-bubble">
-            <div class="message-content">${formatMessage(content)}</div>
-        </div>
-    `;
+    // 為 AI 訊息建立特殊的內容結構
+    if (type === 'ai') {
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <span>${headerText}</span>
+            </div>
+            <div class="message-bubble">
+                <div class="message-content voice-loading">
+                    <div class="voice-loading-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <div class="voice-text" style="display: none;" data-full-text="${escapeHtml(content)}"></div>
+                </div>
+            </div>
+        `;
+    } else {
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <span>${headerText}</span>
+            </div>
+            <div class="message-bubble">
+                <div class="message-content">${formatMessage(content)}</div>
+            </div>
+        `;
+    }
 
     chatContainer.appendChild(messageDiv);
     scrollToBottom();
+
+    // 如果是 AI 訊息，自動播放語音並加入字幕效果
+    if (type === 'ai') {
+        playAIVoiceWithCaption(content, messageDiv);
+    }
+}
+
+// 輔助函數：跳脫 HTML 用於 data 屬性
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML.replace(/"/g, '&quot;');
 }
 
 /**

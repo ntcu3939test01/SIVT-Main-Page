@@ -684,6 +684,174 @@ body {
     margin-top: 8px;
 }
 
+/* 語音按鈕 */
+.voice-btn {
+    width: 42px;
+    height: 42px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.voice-btn:hover {
+    background: var(--primary-light);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.voice-btn:active {
+    transform: scale(0.95);
+}
+
+.voice-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* 錄音中狀態 */
+.voice-btn.recording {
+    background: linear-gradient(135deg, var(--error-color), #dc2626);
+    border-color: var(--error-color);
+    color: white;
+    animation: recordingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes recordingPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+
+    50% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+}
+
+/* 語音字幕效果 */
+.message-content.voice-loading {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.voice-loading-indicator {
+    display: flex;
+    gap: 6px;
+    padding: 8px 0;
+}
+
+.voice-loading-indicator span {
+    width: 8px;
+    height: 8px;
+    background: var(--primary-color);
+    border-radius: 50%;
+    animation: loadingBounce 1.4s ease-in-out infinite;
+    opacity: 0.6;
+}
+
+.voice-loading-indicator span:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.voice-loading-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.voice-loading-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes loadingBounce {
+
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.6;
+    }
+
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+.voice-text {
+    line-height: 1.6;
+}
+
+.message-content.voice-typing .voice-text {
+    animation: none;
+}
+
+.message-content.voice-completed .voice-text {
+    opacity: 1;
+}
+
+/* 音訊控制按鈕 */
+.audio-controls {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.audio-play-btn {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(6, 182, 212, 0.15));
+    border: 1.5px solid rgba(14, 165, 233, 0.4);
+    border-radius: 50%;
+    color: var(--primary-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.audio-play-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.audio-play-btn:hover::before {
+    opacity: 1;
+}
+
+.audio-play-btn:hover {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(6, 182, 212, 0.25));
+    border-color: var(--primary-color);
+    transform: scale(1.08);
+    box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+}
+
+.audio-play-btn:active {
+    transform: scale(0.95);
+}
+
+.audio-play-btn svg {
+    width: 16px;
+    height: 16px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
 /* ===== 響應式設計 ===== */
 @media (max-width: 900px) {
     .sidebar {
